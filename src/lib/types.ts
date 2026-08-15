@@ -21,8 +21,20 @@ export interface RecipeStep {
   minutes: number;
 }
 
+export interface DishPhoto {
+  url: string;
+  fullUrl: string;
+  title: string;
+  credit: string;
+  license: string;
+  licenseUrl: string | null;
+  sourceUrl: string;
+  source: "Openverse" | "Wikimedia Commons";
+}
+
 export interface Recipe {
   title: string;
+  photoQuery: string;
   cuisine: string;
   description: string;
   totalMinutes: number;
@@ -33,4 +45,5 @@ export interface Recipe {
   shoppingList: string[];
   steps: RecipeStep[];
   tips: string[];
+  photos?: DishPhoto[];
 }

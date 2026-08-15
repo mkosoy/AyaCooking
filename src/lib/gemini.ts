@@ -7,6 +7,7 @@ const recipeSchema: Schema = {
   type: Type.OBJECT,
   required: [
     "title",
+    "photoQuery",
     "cuisine",
     "description",
     "totalMinutes",
@@ -20,6 +21,7 @@ const recipeSchema: Schema = {
   ],
   properties: {
     title: { type: Type.STRING },
+    photoQuery: { type: Type.STRING },
     cuisine: { type: Type.STRING },
     description: { type: Type.STRING },
     totalMinutes: { type: Type.INTEGER },
@@ -84,6 +86,7 @@ function buildPrompt(req: RecipeRequest): string {
       ? "- You may add a small number of extra ingredients that are worth a trip to the shop; keep shoppingList short and cheap."
       : "- Use ONLY the listed ingredients plus water, salt, pepper, oil and common dry spices. shoppingList must be empty.",
     "- steps.minutes are per-step and should roughly sum to totalMinutes; activeMinutes excludes unattended time.",
+    "- photoQuery: two to five words a stock-photo search would match for the finished dish, e.g. 'satsivi georgian walnut chicken' or 'pad kee mao noodles'. No quantities, no adjectives about your version.",
     "- Instructions must be specific: temperatures, pan sizes, visual cues. No vague 'cook until done'.",
   );
 
