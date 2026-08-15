@@ -1,42 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { CUISINES, DIETARY, t, type Lang } from "@/lib/i18n";
+import { useStoredString } from "@/lib/storage";
 import type { Recipe } from "@/lib/types";
 
-const CUISINES = [
-  "Georgian",
-  "Japanese",
-  "Thai",
-  "Mexican",
-  "Sicilian",
-  "Lebanese",
-  "Ethiopian",
-  "Vietnamese",
-  "Peruvian",
-  "Korean",
-  "Indian",
-  "French",
-];
-
 const TIME_PRESETS = [15, 30, 45, 60, 90, 120];
+const CUISINE_STORAGE_KEY = "sous.customCuisines";
+const MAX_CUSTOM_CUISINES = 20;
+const MAX_CUISINE_LENGTH = 60;
 
-const DIETARY = [
-  "vegetarian",
-  "vegan",
-  "gluten-free",
-  "dairy-free",
-  "nut-free",
-  "pescatarian",
-  "halal",
-  "low-carb",
-];
+function parseIngredients(value: string): string[] {
+  return value
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+}
 
 export default function RecipeForm({
+  lang,
   onRecipe,
 }: {
+  lang: Lang;
   onRecipe: (recipe: Recipe | null) => void;
 }) {
   const [cuisine, setCuisine] = useState("Georgian");
+  const [storedCuisines, storeCuisines] = useStoredString(CUISINE_STORAGE_KEY);
   const [ingredientInput, setIngredientInput] = useState("");
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [timeMinutes, setTimeMinutes] = useState(45);
@@ -47,11 +36,37 @@ export default function RecipeForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const customCuisines = useMemo(() => {
+    if (!storedCuisines) return [];
+    try {
+      const parsed: unknown = JSON.parse(storedCuisines);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter((entry): entry is string => typeof entry === "string")
+        .slice(0, MAX_CUSTOM_CUISINES);
+    } catch {
+      return [];
+    }
+  }, [storedCuisines]);
+
+  function saveCustomCuisines(next: string[]) {
+    storeCuisines(JSON.stringify(next));
+  }
+
+  function addCustomCuisine() {
+    const value = cuisine.trim().slice(0, MAX_CUISINE_LENGTH);
+    if (!value) return;
+    const known = [...CUISINES.map((option) => option.value), ...customCuisines];
+    if (known.some((entry) => entry.toLowerCase() === value.toLowerCase())) return;
+    saveCustomCuisines([...customCuisines, value].slice(-MAX_CUSTOM_CUISINES));
+  }
+
+  function removeCustomCuisine(value: string) {
+    saveCustomCuisines(customCuisines.filter((entry) => entry !== value));
+  }
+
   function addIngredients(value: string) {
-    const parts = value
-      .split(",")
-      .map((part) => part.trim().toLowerCase())
-      .filter(Boolean);
+    const parts = parseIngredients(value);
     if (!parts.length) return;
     setIngredients((current) => [...new Set([...current, ...parts])]);
     setIngredientInput("");
@@ -65,9 +80,9 @@ export default function RecipeForm({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const pending = ingredientInput.trim();
-    const finalIngredients = pending
-      ? [...new Set([...ingredients, ...pending.split(",").map((p) => p.trim().toLowerCase())])]
+    const pending = parseIngredients(ingredientInput);
+    const finalIngredients = pending.length
+      ? [...new Set([...ingredients, ...pending])]
       : ingredients;
     setIngredients(finalIngredients);
     setIngredientInput("");
@@ -81,6 +96,7 @@ export default function RecipeForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cuisine,
+          language: lang,
           ingredients: finalIngredients,
           timeMinutes,
           servings,
@@ -91,15 +107,20 @@ export default function RecipeForm({
       });
       const data = (await response.json()) as { recipe?: Recipe; error?: string };
       if (!response.ok || !data.recipe) {
-        throw new Error(data.error ?? "Something went wrong");
+        throw new Error(data.error ?? t(lang, "genericError"));
       }
       onRecipe(data.recipe);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong");
+      setError(caught instanceof Error ? caught.message : t(lang, "genericError"));
     } finally {
       setLoading(false);
     }
   }
+
+  const chipClass = (selected: boolean) =>
+    selected
+      ? "rounded-full bg-amber-900 px-3 py-1 text-sm text-amber-50"
+      : "rounded-full bg-amber-100 px-3 py-1 text-sm text-amber-900 hover:bg-amber-200";
 
   return (
     <form
@@ -112,31 +133,68 @@ export default function RecipeForm({
             htmlFor="cuisine"
             className="block text-sm font-semibold uppercase tracking-wide text-amber-800"
           >
-            1. What cuisine?
+            {t(lang, "cuisineLabel")}
           </label>
-          <input
-            id="cuisine"
-            value={cuisine}
-            onChange={(event) => setCuisine(event.target.value)}
-            placeholder="Georgian, Oaxacan, Sichuan…"
-            className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-4 py-3 text-amber-950 outline-none placeholder:text-amber-400 focus:border-amber-500"
-          />
+          <div className="mt-2 flex gap-2">
+            <input
+              id="cuisine"
+              value={cuisine}
+              maxLength={MAX_CUISINE_LENGTH}
+              onChange={(event) => setCuisine(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addCustomCuisine();
+                }
+              }}
+              placeholder={t(lang, "cuisinePlaceholder")}
+              className="w-full rounded-xl border border-amber-200 bg-white px-4 py-3 text-amber-950 outline-none placeholder:text-amber-400 focus:border-amber-500"
+            />
+            <button
+              type="button"
+              onClick={addCustomCuisine}
+              className="shrink-0 rounded-xl border border-amber-300 px-4 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+            >
+              + {t(lang, "addCuisine")}
+            </button>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {CUISINES.map((option) => (
               <button
-                key={option}
+                key={option.value}
                 type="button"
-                onClick={() => setCuisine(option)}
-                className={
-                  cuisine === option
-                    ? "rounded-full bg-amber-900 px-3 py-1 text-sm text-amber-50"
-                    : "rounded-full bg-amber-100 px-3 py-1 text-sm text-amber-900 hover:bg-amber-200"
-                }
+                onClick={() => setCuisine(option.value)}
+                className={chipClass(cuisine === option.value)}
               >
-                {option}
+                {option.label[lang]}
               </button>
             ))}
           </div>
+
+          {customCuisines.length > 0 && (
+            <div className="mt-4">
+              <span className="text-xs font-semibold uppercase tracking-wide text-amber-700/80">
+                {t(lang, "myCuisines")}
+              </span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {customCuisines.map((option) => (
+                  <span key={option} className={`${chipClass(cuisine === option)} inline-flex`}>
+                    <button type="button" onClick={() => setCuisine(option)}>
+                      {option}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomCuisine(option)}
+                      aria-label={`${t(lang, "removeCuisine")}: ${option}`}
+                      className="ml-2 opacity-60 hover:opacity-100"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -144,7 +202,7 @@ export default function RecipeForm({
             htmlFor="ingredients"
             className="block text-sm font-semibold uppercase tracking-wide text-amber-800"
           >
-            2. What ingredients do you have?
+            {t(lang, "ingredientsLabel")}
           </label>
           <input
             id="ingredients"
@@ -157,7 +215,7 @@ export default function RecipeForm({
               }
             }}
             onBlur={() => addIngredients(ingredientInput)}
-            placeholder="walnuts, chicken thighs, coriander — press Enter after each"
+            placeholder={t(lang, "ingredientsPlaceholder")}
             className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-4 py-3 text-amber-950 outline-none placeholder:text-amber-400 focus:border-amber-500"
           />
           {ingredients.length > 0 && (
@@ -182,7 +240,7 @@ export default function RecipeForm({
             htmlFor="time"
             className="block text-sm font-semibold uppercase tracking-wide text-amber-800"
           >
-            3. How much time do you have?
+            {t(lang, "timeLabel")}
           </label>
           <div className="mt-2 flex items-center gap-4">
             <input
@@ -196,7 +254,7 @@ export default function RecipeForm({
               className="w-full accent-amber-800"
             />
             <span className="w-24 shrink-0 text-right text-lg font-semibold text-amber-950">
-              {timeMinutes} min
+              {timeMinutes} {t(lang, "minutesShort")}
             </span>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -205,13 +263,9 @@ export default function RecipeForm({
                 key={preset}
                 type="button"
                 onClick={() => setTimeMinutes(preset)}
-                className={
-                  timeMinutes === preset
-                    ? "rounded-full bg-amber-900 px-3 py-1 text-sm text-amber-50"
-                    : "rounded-full bg-amber-100 px-3 py-1 text-sm text-amber-900 hover:bg-amber-200"
-                }
+                className={chipClass(timeMinutes === preset)}
               >
-                {preset} min
+                {preset} {t(lang, "minutesShort")}
               </button>
             ))}
           </div>
@@ -223,7 +277,7 @@ export default function RecipeForm({
               htmlFor="servings"
               className="block text-sm font-semibold uppercase tracking-wide text-amber-800"
             >
-              Servings
+              {t(lang, "servings")}
             </label>
             <input
               id="servings"
@@ -237,7 +291,7 @@ export default function RecipeForm({
           </div>
           <div>
             <span className="block text-sm font-semibold uppercase tracking-wide text-amber-800">
-              Pantry rules
+              {t(lang, "pantryRules")}
             </span>
             <label className="mt-3 flex items-start gap-3 text-sm text-amber-900">
               <input
@@ -246,28 +300,24 @@ export default function RecipeForm({
                 onChange={(event) => setAllowExtraIngredients(event.target.checked)}
                 className="mt-0.5 size-4 accent-amber-800"
               />
-              Suggest a few extra ingredients worth buying
+              {t(lang, "allowExtra")}
             </label>
           </div>
         </div>
 
         <div>
           <span className="block text-sm font-semibold uppercase tracking-wide text-amber-800">
-            Dietary needs
+            {t(lang, "dietaryNeeds")}
           </span>
           <div className="mt-3 flex flex-wrap gap-2">
             {DIETARY.map((diet) => (
               <button
-                key={diet}
+                key={diet.value}
                 type="button"
-                onClick={() => toggleDiet(diet)}
-                className={
-                  dietary.includes(diet)
-                    ? "rounded-full bg-amber-900 px-3 py-1 text-sm text-amber-50"
-                    : "rounded-full bg-amber-100 px-3 py-1 text-sm text-amber-900 hover:bg-amber-200"
-                }
+                onClick={() => toggleDiet(diet.value)}
+                className={chipClass(dietary.includes(diet.value))}
               >
-                {diet}
+                {diet.label[lang]}
               </button>
             ))}
           </div>
@@ -278,14 +328,14 @@ export default function RecipeForm({
             htmlFor="notes"
             className="block text-sm font-semibold uppercase tracking-wide text-amber-800"
           >
-            Anything else?
+            {t(lang, "anythingElse")}
           </label>
           <textarea
             id="notes"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             rows={2}
-            placeholder="No oven, cooking for a kid, want it spicy…"
+            placeholder={t(lang, "notesPlaceholder")}
             className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-4 py-3 text-amber-950 outline-none placeholder:text-amber-400 focus:border-amber-500"
           />
         </div>
@@ -300,7 +350,7 @@ export default function RecipeForm({
         disabled={loading}
         className="mt-6 w-full rounded-xl bg-amber-900 px-6 py-4 text-lg font-semibold text-amber-50 transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-amber-900/50"
       >
-        {loading ? "Writing your recipe…" : "Give me a recipe"}
+        {loading ? t(lang, "submitting") : t(lang, "submit")}
       </button>
     </form>
   );

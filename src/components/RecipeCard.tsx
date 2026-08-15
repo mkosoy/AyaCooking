@@ -1,5 +1,8 @@
 import DishPhotos from "./DishPhotos";
-import type { Recipe } from "@/lib/types";
+import { t, type Lang } from "@/lib/i18n";
+import type { Difficulty, Recipe } from "@/lib/types";
+
+const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -10,11 +13,13 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function RecipeCard({ recipe }: { recipe: Recipe }) {
+export default function RecipeCard({ lang, recipe }: { lang: Lang; recipe: Recipe }) {
+  const minutes = t(lang, "minutesShort");
+
   return (
     <article className="rounded-3xl border border-amber-200 bg-white/80 p-6 shadow-sm sm:p-8">
       {recipe.photos && recipe.photos.length > 0 && (
-        <DishPhotos key={recipe.photos[0].url} photos={recipe.photos} />
+        <DishPhotos key={recipe.photos[0].url} lang={lang} photos={recipe.photos} />
       )}
 
       <header>
@@ -26,15 +31,18 @@ export default function RecipeCard({ recipe }: { recipe: Recipe }) {
       </header>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Total" value={`${recipe.totalMinutes} min`} />
-        <Stat label="Hands-on" value={`${recipe.activeMinutes} min`} />
-        <Stat label="Serves" value={String(recipe.servings)} />
-        <Stat label="Difficulty" value={recipe.difficulty} />
+        <Stat label={t(lang, "total")} value={`${recipe.totalMinutes} ${minutes}`} />
+        <Stat label={t(lang, "handsOn")} value={`${recipe.activeMinutes} ${minutes}`} />
+        <Stat label={t(lang, "serves")} value={String(recipe.servings)} />
+        <Stat
+          label={t(lang, "difficulty")}
+          value={t(lang, DIFFICULTIES.includes(recipe.difficulty) ? recipe.difficulty : "medium")}
+        />
       </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_1.4fr]">
         <section>
-          <h3 className="text-lg font-semibold text-amber-950">Ingredients</h3>
+          <h3 className="text-lg font-semibold text-amber-950">{t(lang, "ingredients")}</h3>
           <ul className="mt-3 space-y-2">
             {recipe.ingredients.map((ingredient) => (
               <li
@@ -52,7 +60,7 @@ export default function RecipeCard({ recipe }: { recipe: Recipe }) {
                 <span>
                   <span className="font-medium">{ingredient.quantity}</span> {ingredient.item}
                   {!ingredient.haveIt && (
-                    <span className="ml-1 text-xs text-amber-700/80">(to buy)</span>
+                    <span className="ml-1 text-xs text-amber-700/80">{t(lang, "toBuy")}</span>
                   )}
                 </span>
               </li>
@@ -62,7 +70,7 @@ export default function RecipeCard({ recipe }: { recipe: Recipe }) {
           {recipe.shoppingList.length > 0 && (
             <div className="mt-6 rounded-2xl bg-amber-50 p-4">
               <h4 className="text-sm font-semibold uppercase tracking-wide text-amber-800">
-                Shopping list
+                {t(lang, "shoppingList")}
               </h4>
               <ul className="mt-2 list-disc pl-5 text-sm text-amber-900">
                 {recipe.shoppingList.map((item) => (
@@ -74,7 +82,7 @@ export default function RecipeCard({ recipe }: { recipe: Recipe }) {
         </section>
 
         <section>
-          <h3 className="text-lg font-semibold text-amber-950">Method</h3>
+          <h3 className="text-lg font-semibold text-amber-950">{t(lang, "method")}</h3>
           <ol className="mt-3 space-y-4">
             {recipe.steps.map((step, index) => (
               <li key={step.instruction} className="flex gap-3">
@@ -84,7 +92,7 @@ export default function RecipeCard({ recipe }: { recipe: Recipe }) {
                 <div>
                   <p className="text-amber-900">{step.instruction}</p>
                   <p className="mt-1 text-xs uppercase tracking-wide text-amber-700/70">
-                    ~{step.minutes} min
+                    ~{step.minutes} {minutes}
                   </p>
                 </div>
               </li>
@@ -94,7 +102,7 @@ export default function RecipeCard({ recipe }: { recipe: Recipe }) {
           {recipe.tips.length > 0 && (
             <div className="mt-6 rounded-2xl border border-dashed border-amber-300 p-4">
               <h4 className="text-sm font-semibold uppercase tracking-wide text-amber-800">
-                Cook&apos;s notes
+                {t(lang, "cooksNotes")}
               </h4>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
                 {recipe.tips.map((tip) => (

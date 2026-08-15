@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { t, type Lang } from "@/lib/i18n";
 import type { DishPhoto } from "@/lib/types";
 
-export default function DishPhotos({ photos }: { photos: DishPhoto[] }) {
+export default function DishPhotos({ lang, photos }: { lang: Lang; photos: DishPhoto[] }) {
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
   const [broken, setBroken] = useState<string[]>([]);
 
@@ -29,7 +30,7 @@ export default function DishPhotos({ photos }: { photos: DishPhoto[] }) {
               key={photo.url}
               type="button"
               onClick={() => setActiveUrl(photo.url)}
-              aria-label={`Show photo ${index + 1}`}
+              aria-label={`${t(lang, "showPhoto")} ${index + 1}`}
               aria-current={photo.url === hero.url}
               className={
                 photo.url === hero.url
@@ -50,7 +51,7 @@ export default function DishPhotos({ photos }: { photos: DishPhoto[] }) {
       )}
 
       <figcaption className="mt-2 text-xs text-amber-700/80">
-        Photo of a similar dish ·{" "}
+        {t(lang, "photoCaption")} ·{" "}
         <a href={hero.sourceUrl} target="_blank" rel="noreferrer" className="underline">
           {hero.source}
         </a>{" "}
