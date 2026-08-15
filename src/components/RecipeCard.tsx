@@ -1,3 +1,4 @@
+import DishPhotos from "./DishPhotos";
 import type { Recipe } from "@/lib/types";
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -12,6 +13,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default function RecipeCard({ recipe }: { recipe: Recipe }) {
   return (
     <article className="rounded-3xl border border-amber-200 bg-white/80 p-6 shadow-sm sm:p-8">
+      {recipe.photos && recipe.photos.length > 0 && (
+        <DishPhotos key={recipe.photos[0].url} photos={recipe.photos} />
+      )}
+
       <header>
         <p className="text-sm font-medium uppercase tracking-widest text-amber-700">
           {recipe.cuisine}
