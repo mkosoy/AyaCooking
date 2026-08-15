@@ -24,6 +24,11 @@ npm run dev                  # http://localhost:3000
 
 Get a free key at https://aistudio.google.com/app/apikey.
 
+## Deploy
+
+Live at https://ayacooking.vercel.app (Vercel project `ayacooking`). `GEMINI_API_KEY` is set as a
+Vercel environment variable for production and preview; deploy with `vercel --prod`.
+
 ## Scripts
 
 | Command | Purpose |
