@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       {
         error: missingKey
           ? "The server is missing GEMINI_API_KEY. Add it to .env.local and restart."
-          : `Could not write that recipe: ${message}`,
+          : "Could not write that recipe. Please try again.",
       },
       { status: missingKey ? 500 : 502 },
     );
