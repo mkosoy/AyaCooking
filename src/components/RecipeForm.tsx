@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CUISINES, DIETARY, t, type Lang } from "@/lib/i18n";
+import { useMemo, useRef, useState } from "react";
+import { CUISINES, DIETARY, LANGS, t, type Lang } from "@/lib/i18n";
 import { useStoredString } from "@/lib/storage";
 import type { Recipe } from "@/lib/types";
 
@@ -34,7 +34,10 @@ export default function RecipeForm({
   const [allowExtraIngredients, setAllowExtraIngredients] = useState(true);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Server messages arrive already localized, so an error is tagged with the
+  // language it was written in and dropped when the reader switches language.
+  const [error, setError] = useState<{ lang: Lang; message: string } | null>(null);
+  const cuisineRef = useRef<HTMLInputElement>(null);
 
   const customCuisines = useMemo(() => {
     if (!storedCuisines) return [];
@@ -56,9 +59,15 @@ export default function RecipeForm({
   function addCustomCuisine() {
     const value = cuisine.trim().slice(0, MAX_CUISINE_LENGTH);
     if (!value) return;
-    const known = [...CUISINES.map((option) => option.value), ...customCuisines];
+    const known = [
+      ...CUISINES.flatMap((option) => [option.value, ...LANGS.map((l) => option.label[l])]),
+      ...customCuisines,
+    ];
     if (known.some((entry) => entry.toLowerCase() === value.toLowerCase())) return;
     saveCustomCuisines([...customCuisines, value].slice(-MAX_CUSTOM_CUISINES));
+    // The field doubles as the current selection, so keep the name but select it:
+    // typing the next cuisine replaces it instead of appending.
+    cuisineRef.current?.select();
   }
 
   function removeCustomCuisine(value: string) {
@@ -111,7 +120,10 @@ export default function RecipeForm({
       }
       onRecipe(data.recipe);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t(lang, "genericError"));
+      setError({
+        lang,
+        message: caught instanceof Error ? caught.message : t(lang, "genericError"),
+      });
     } finally {
       setLoading(false);
     }
@@ -138,6 +150,7 @@ export default function RecipeForm({
           <div className="mt-2 flex gap-2">
             <input
               id="cuisine"
+              ref={cuisineRef}
               value={cuisine}
               maxLength={MAX_CUISINE_LENGTH}
               onChange={(event) => setCuisine(event.target.value)}
@@ -341,8 +354,8 @@ export default function RecipeForm({
         </div>
       </fieldset>
 
-      {error && (
-        <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
+      {error?.lang === lang && (
+        <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{error.message}</p>
       )}
 
       <button
