@@ -64,7 +64,11 @@ export async function POST(request: Request) {
 
   try {
     const recipe = await generateRecipe(parsed);
-    const photos = await findDishPhotos(recipe.photoQuery || recipe.title);
+    const photos = await findDishPhotos([
+      recipe.photoQuery,
+      recipe.title,
+      `${recipe.cuisine} food`,
+    ]);
     return Response.json({ recipe: { ...recipe, photos } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

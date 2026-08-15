@@ -1,6 +1,17 @@
 import type { DishPhoto } from "./types";
 
 const FETCH_TIMEOUT_MS = 6000;
+const MAX_SEARCHES = 8;
+
+/** Words too generic to search on their own — they match any food photo. */
+const GENERIC_WORDS = new Set([
+  "chicken", "beef", "pork", "lamb", "fish", "salmon", "tuna", "prawns", "shrimp", "tofu",
+  "cheese", "eggs", "pasta", "curry", "dumplings", "potato",
+  "potatoes", "tomato", "tomatoes", "walnut", "walnuts", "garlic", "onion", "noodle", "noodles",
+  "rice", "bread", "sauce", "soup", "stew", "salad", "bowl", "skillet", "food", "dish", "recipe",
+  "vegan", "vegetarian", "gluten", "quick", "easy", "spicy", "fried", "grilled", "baked",
+  "roast", "roasted", "braised", "steamed", "style", "with", "and",
+]);
 
 async function fetchJson(url: string): Promise<unknown | null> {
   try {
@@ -24,6 +35,17 @@ interface OpenverseResult {
   license_version?: string;
   license_url?: string;
   foreign_landing_url?: string;
+  tags?: { name?: string }[];
+}
+
+/**
+ * Both sources rank fuzzily (Commons also matches on description text), so a
+ * rare dish name happily returns a photo of a motorway. Keep only results whose
+ * own text accounts for every search word.
+ */
+function matchesQuery(text: (string | undefined)[], query: string): boolean {
+  const haystack = text.filter(Boolean).join(" ").toLowerCase();
+  return query.split(" ").every((word) => haystack.includes(word));
 }
 
 async function searchOpenverse(query: string, limit: number): Promise<DishPhoto[]> {
@@ -40,7 +62,11 @@ async function searchOpenverse(query: string, limit: number): Promise<DishPhoto[
   if (!data?.results) return [];
 
   return data.results
-    .filter((result) => Boolean(result.url))
+    .filter(
+      (result) =>
+        Boolean(result.url) &&
+        matchesQuery([result.title, ...(result.tags ?? []).map((tag) => tag.name)], query),
+    )
     .slice(0, limit)
     .map((result) => ({
       url: result.thumbnail ?? result.url!,
@@ -81,7 +107,7 @@ async function searchCommons(query: string, limit: number): Promise<DishPhoto[]>
       generator: "search",
       gsrsearch: `${query} filetype:bitmap`,
       gsrnamespace: "6",
-      gsrlimit: String(limit),
+      gsrlimit: String(limit * 4),
       prop: "imageinfo",
       iiprop: "url|extmetadata",
       iiurlwidth: "1200",
@@ -97,6 +123,7 @@ async function searchCommons(query: string, limit: number): Promise<DishPhoto[]>
     .map((page): DishPhoto | null => {
       const info = page.imageinfo?.[0];
       if (!info?.thumburl && !info?.url) return null;
+      if (!matchesQuery([page.title], query)) return null;
       const meta = info?.extmetadata;
       return {
         url: info?.thumburl ?? info!.url!,
@@ -113,17 +140,10 @@ async function searchCommons(query: string, limit: number): Promise<DishPhoto[]>
     .slice(0, limit);
 }
 
-/**
- * Freely licensed photos of the dish, best match first. Never throws: a recipe
- * without photos is still a useful recipe.
- */
-export async function findDishPhotos(query: string, limit = 3): Promise<DishPhoto[]> {
-  const trimmed = query.trim();
-  if (!trimmed) return [];
-
+async function search(query: string, limit: number): Promise<DishPhoto[]> {
   const [openverse, commons] = await Promise.all([
-    searchOpenverse(trimmed, limit),
-    searchCommons(trimmed, limit),
+    searchOpenverse(query, limit),
+    searchCommons(query, limit),
   ]);
 
   const merged: DishPhoto[] = [];
@@ -135,4 +155,43 @@ export async function findDishPhotos(query: string, limit = 3): Promise<DishPhot
     if (merged.length === limit) break;
   }
   return merged;
+}
+
+/**
+ * Both image sources match on exact phrases, so a full dish description usually
+ * returns nothing ("qatmis satsivi chicken walnut sauce" → 0 hits, "satsivi" → 3).
+ * Progressively shorten each candidate until something matches.
+ */
+function queryVariants(candidates: string[]): string[] {
+  const variants: string[] = [];
+  for (const candidate of candidates) {
+    const words = candidate
+      .toLowerCase()
+      .replace(/[()"'’,.]/g, " ")
+      .split(/[\s—–-]+/)
+      .filter(Boolean);
+    // A lone word is only specific enough when the whole candidate is a short
+    // dish name ("satsivi"); truncating a long phrase down to "chicken" would
+    // match any food photo at all.
+    const shortest = words.length <= 3 && !words.every((word) => GENERIC_WORDS.has(word)) ? 1 : 2;
+    for (let length = words.length; length >= Math.min(shortest, words.length); length--) {
+      const variant = words.slice(0, length).join(" ");
+      if (!variant || (length === 1 && GENERIC_WORDS.has(variant))) continue;
+      if (!variants.includes(variant)) variants.push(variant);
+    }
+  }
+  return variants.slice(0, MAX_SEARCHES);
+}
+
+/**
+ * Freely licensed photos of the dish, best match first. Never throws: a recipe
+ * without photos is still a useful recipe. Candidates are tried in order (e.g.
+ * the model's photo query, then the recipe title, then the cuisine).
+ */
+export async function findDishPhotos(candidates: string[], limit = 3): Promise<DishPhoto[]> {
+  for (const variant of queryVariants(candidates.filter((c) => c?.trim()))) {
+    const photos = await search(variant, limit);
+    if (photos.length) return photos;
+  }
+  return [];
 }
