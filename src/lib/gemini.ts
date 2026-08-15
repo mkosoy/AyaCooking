@@ -90,6 +90,13 @@ function buildPrompt(req: RecipeRequest): string {
     "- Instructions must be specific: temperatures, pan sizes, visual cues. No vague 'cook until done'.",
   );
 
+  if (req.language === "ru") {
+    lines.push(
+      "- Write title, description, cuisine, ingredients.item, quantity, shoppingList, steps.instruction and tips in Russian. Keep the dish's native name and add a Russian gloss in parentheses when it helps.",
+      "- photoQuery is the exception: keep it in Latin script (transliterated or English), because it is used to search photo archives.",
+    );
+  }
+
   return lines.join("\n");
 }
 

@@ -1,18 +1,21 @@
 import { generateRecipe } from "@/lib/gemini";
+import { apiError, isLang, type Lang } from "@/lib/i18n";
 import { findDishPhotos } from "@/lib/photos";
 import type { RecipeRequest } from "@/lib/types";
 
 const MAX_INGREDIENTS = 40;
+const CYRILLIC = /[\u0400-\u04ff]/;
 
 function parseBody(body: unknown): RecipeRequest | string {
   if (typeof body !== "object" || body === null) {
-    return "Invalid request body";
+    return apiError("en", "badBody");
   }
   const raw = body as Record<string, unknown>;
+  const language: Lang = isLang(raw.language) ? raw.language : "en";
 
   const cuisine = typeof raw.cuisine === "string" ? raw.cuisine.trim() : "";
   if (!cuisine) {
-    return "Tell me a cuisine first (e.g. Georgian, Thai, Sicilian).";
+    return apiError(language, "noCuisine");
   }
 
   const ingredients = Array.isArray(raw.ingredients)
@@ -25,7 +28,7 @@ function parseBody(body: unknown): RecipeRequest | string {
 
   const timeMinutes = Number(raw.timeMinutes);
   if (!Number.isFinite(timeMinutes) || timeMinutes < 5 || timeMinutes > 600) {
-    return "How much time do you have? Pick between 5 and 600 minutes.";
+    return apiError(language, "badTime");
   }
 
   const servingsValue = Number(raw.servings);
@@ -40,6 +43,7 @@ function parseBody(body: unknown): RecipeRequest | string {
 
   return {
     cuisine: cuisine.slice(0, 60),
+    language,
     ingredients,
     timeMinutes: Math.round(timeMinutes),
     servings,
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    return Response.json({ error: apiError("en", "badJson") }, { status: 400 });
   }
 
   const parsed = parseBody(body);
@@ -64,11 +68,13 @@ export async function POST(request: Request) {
 
   try {
     const recipe = await generateRecipe(parsed);
-    const photos = await findDishPhotos([
-      recipe.photoQuery,
-      recipe.title,
-      `${recipe.cuisine} food`,
-    ]);
+    // Photo archives are searched in Latin script, so Cyrillic recipe text is
+    // useless as a fallback query.
+    const photos = await findDishPhotos(
+      [recipe.photoQuery, recipe.title, `${recipe.cuisine} food`].filter(
+        (candidate) => !CYRILLIC.test(candidate),
+      ),
+    );
     return Response.json({ recipe: { ...recipe, photos } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -77,8 +83,8 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error: missingKey
-          ? "The server is missing GEMINI_API_KEY. Add it to .env.local and restart."
-          : `Could not write that recipe: ${message}`,
+          ? apiError(parsed.language, "missingKey")
+          : apiError(parsed.language, "generationFailed"),
       },
       { status: missingKey ? 500 : 502 },
     );

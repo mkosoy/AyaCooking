@@ -3,7 +3,10 @@
 A one-screen cooking app: pick a cuisine, list the ingredients you actually have, say how much
 time you've got, and get a single recipe that fits inside that time budget.
 
-- Cuisine as free text with quick picks (Georgian, Sichuan, Oaxacan, …)
+- English or Russian: the `EN | RU` toggle localizes the whole UI and asks the model to write the
+  recipe itself in Russian (the photo search query stays in Latin script so photos still resolve)
+- Cuisine as free text with quick picks (Georgian, Sichuan, Oaxacan, …); `+ Add` keeps your own
+  cuisines as chips in `localStorage`
 - Ingredient chips — green dot = you have it, amber dot = shopping list
 - Time slider that the recipe must respect (`totalMinutes <= your budget`)
 - Servings, dietary filters, and free-form notes ("no oven", "make it spicy")
@@ -45,5 +48,7 @@ Vercel environment variable for production and preview; deploy with `vercel --pr
 - `src/components/RecipeCard.tsx` — rendered recipe
 - `src/app/api/recipe/route.ts` — validates input, calls the model
 - `src/lib/gemini.ts` — prompt + response schema
+- `src/lib/i18n.ts` — UI strings, cuisine/dietary labels, API messages in both languages
+- `src/lib/storage.ts` — `localStorage`-backed render state (language, custom cuisines)
 - `src/lib/photos.ts` — freely licensed dish photo lookup (Commons + Openverse)
 - `src/components/DishPhotos.tsx` — hero photo, thumbnails, attribution

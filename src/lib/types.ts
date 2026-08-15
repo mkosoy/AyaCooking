@@ -1,7 +1,10 @@
+import type { Lang } from "./i18n";
+
 export type Difficulty = "easy" | "medium" | "hard";
 
 export interface RecipeRequest {
   cuisine: string;
+  language: Lang;
   ingredients: string[];
   timeMinutes: number;
   servings: number;
