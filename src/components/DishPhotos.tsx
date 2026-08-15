@@ -1,16 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { DishPhoto } from "@/lib/types";
 
 export default function DishPhotos({ photos }: { photos: DishPhoto[] }) {
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
   const [broken, setBroken] = useState<string[]>([]);
-
-  useEffect(() => {
-    setActiveUrl(null);
-    setBroken([]);
-  }, [photos]);
 
   const usable = photos.filter((photo) => !broken.includes(photo.url));
   if (!usable.length) return null;
