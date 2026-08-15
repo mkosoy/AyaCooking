@@ -47,11 +47,15 @@ export default function RecipeForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function addIngredients(value: string) {
-    const parts = value
+  function parseIngredients(value: string): string[] {
+    return value
       .split(",")
       .map((part) => part.trim().toLowerCase())
       .filter(Boolean);
+  }
+
+  function addIngredients(value: string) {
+    const parts = parseIngredients(value);
     if (!parts.length) return;
     setIngredients((current) => [...new Set([...current, ...parts])]);
     setIngredientInput("");
@@ -65,9 +69,9 @@ export default function RecipeForm({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const pending = ingredientInput.trim();
-    const finalIngredients = pending
-      ? [...new Set([...ingredients, ...pending.split(",").map((p) => p.trim().toLowerCase())])]
+    const pending = parseIngredients(ingredientInput);
+    const finalIngredients = pending.length
+      ? [...new Set([...ingredients, ...pending])]
       : ingredients;
     setIngredients(finalIngredients);
     setIngredientInput("");
