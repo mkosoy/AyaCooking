@@ -55,6 +55,7 @@ async function searchOpenverse(query: string, limit: number): Promise<DishPhoto[
 }
 
 interface CommonsPage {
+  index?: number;
   title?: string;
   imageinfo?: {
     thumburl?: string;
@@ -92,6 +93,7 @@ async function searchCommons(query: string, limit: number): Promise<DishPhoto[]>
   if (!pages) return [];
 
   return Object.values(pages)
+    .sort((a, b) => (a.index ?? Number.MAX_SAFE_INTEGER) - (b.index ?? Number.MAX_SAFE_INTEGER))
     .map((page): DishPhoto | null => {
       const info = page.imageinfo?.[0];
       if (!info?.thumburl && !info?.url) return null;

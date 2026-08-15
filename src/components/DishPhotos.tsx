@@ -4,18 +4,18 @@ import { useEffect, useState } from "react";
 import type { DishPhoto } from "@/lib/types";
 
 export default function DishPhotos({ photos }: { photos: DishPhoto[] }) {
-  const [active, setActive] = useState(0);
+  const [activeUrl, setActiveUrl] = useState<string | null>(null);
   const [broken, setBroken] = useState<string[]>([]);
 
   useEffect(() => {
-    setActive(0);
+    setActiveUrl(null);
     setBroken([]);
   }, [photos]);
 
   const usable = photos.filter((photo) => !broken.includes(photo.url));
   if (!usable.length) return null;
 
-  const hero = usable[Math.min(active, usable.length - 1)];
+  const hero = usable.find((photo) => photo.url === activeUrl) ?? usable[0];
 
   return (
     <figure className="mb-6">
@@ -33,7 +33,7 @@ export default function DishPhotos({ photos }: { photos: DishPhoto[] }) {
             <button
               key={photo.url}
               type="button"
-              onClick={() => setActive(index)}
+              onClick={() => setActiveUrl(photo.url)}
               aria-label={`Show photo ${index + 1}`}
               aria-current={photo.url === hero.url}
               className={
